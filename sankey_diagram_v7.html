@@ -1,0 +1,78 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>用户行为流转桑基图 V7 (带连线转化率)</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        html, body, #main {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="main"></div>
+    <script>
+        var chartDom = document.getElementById('main');
+        var myChart = echarts.init(chartDom);
+        var option;
+
+        myChart.showLoading();
+        
+        const nodes = [{"name":"互动","depth":0,"itemStyle":{"color":"#5470c6"},"uv":1072078,"percent":"77.1"},{"name":"无互动","depth":0,"itemStyle":{"color":"#d3d3d3"},"uv":317688,"percent":"22.9"},{"name":"浏览文章","depth":1,"itemStyle":{"color":"#91cc75"},"uv":913360,"percent":"65.7"},{"name":"无浏览文章","depth":1,"itemStyle":{"color":"#d3d3d3"},"uv":476406,"percent":"34.3"},{"name":"浏览付费文章","depth":2,"itemStyle":{"color":"#fac858"},"uv":479315,"percent":"34.5"},{"name":"无浏览付费文章","depth":2,"itemStyle":{"color":"#d3d3d3"},"uv":910451,"percent":"65.5"},{"name":"付费","depth":3,"itemStyle":{"color":"#ee6666"},"uv":66752,"percent":"4.8"},{"name":"未付费","depth":3,"itemStyle":{"color":"#d3d3d3"},"uv":1323014,"percent":"95.2"},{"name":"次日留存","depth":4,"itemStyle":{"color":"#73c0de"},"uv":291272,"percent":"21.0"},{"name":"次日未留存","depth":4,"itemStyle":{"color":"#d3d3d3"},"uv":1098494,"percent":"79.0"}];
+        const links = [{"source":"无互动","target":"无浏览文章","value":297230,"rate":"93.56%","edgeLabel":{"show":false,"formatter":"93.56%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"无浏览文章","target":"无浏览付费文章","value":476406,"rate":"100.00%","edgeLabel":{"show":false,"formatter":"100.00%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"无浏览付费文章","target":"未付费","value":900222,"rate":"98.88%","edgeLabel":{"show":false,"formatter":"98.88%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"未付费","target":"次日留存","value":266171,"rate":"20.12%","edgeLabel":{"show":false,"formatter":"20.12%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"无互动","target":"浏览文章","value":20458,"rate":"6.44%","edgeLabel":{"show":false,"formatter":"6.44%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"浏览文章","target":"无浏览付费文章","value":434045,"rate":"47.52%","edgeLabel":{"show":false,"formatter":"47.52%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"无浏览付费文章","target":"付费","value":10229,"rate":"1.12%","edgeLabel":{"show":false,"formatter":"1.12%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"付费","target":"次日留存","value":25101,"rate":"37.60%","edgeLabel":{"show":true,"formatter":"37.60%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"互动","target":"浏览文章","value":892902,"rate":"83.29%","edgeLabel":{"show":true,"formatter":"83.29%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"浏览文章","target":"浏览付费文章","value":479315,"rate":"52.48%","edgeLabel":{"show":true,"formatter":"52.48%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"浏览付费文章","target":"未付费","value":422792,"rate":"88.21%","edgeLabel":{"show":false,"formatter":"88.21%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"未付费","target":"次日未留存","value":1056843,"rate":"79.88%","edgeLabel":{"show":false,"formatter":"79.88%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"付费","target":"次日未留存","value":41651,"rate":"62.40%","edgeLabel":{"show":false,"formatter":"62.40%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"浏览付费文章","target":"付费","value":56523,"rate":"11.79%","edgeLabel":{"show":true,"formatter":"11.79%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"互动","target":"无浏览文章","value":179176,"rate":"16.71%","edgeLabel":{"show":false,"formatter":"16.71%","color":"#000","fontSize":13,"fontWeight":"bold"}}];
+
+        myChart.hideLoading();
+
+        option = {
+            title: {
+                text: '用户行为流转桑基图 (带节点数据与正向转化率)',
+                left: 'center',
+                top: 20
+            },
+            tooltip: {
+                trigger: 'item',
+                formatter: function(params) {
+                    if (params.dataType === 'edge') {
+                        return params.data.source + ' -> ' + params.data.target + '<br/>' +
+                               'UV: ' + params.data.value + '<br/>' +
+                               '转化率: ' + params.data.rate;
+                    } else {
+                        return params.name + '<br/>UV: ' + params.data.uv + ' (' + params.data.percent + '%)';
+                    }
+                }
+            },
+            series: [
+                {
+                    type: 'sankey',
+                    data: nodes,
+                    links: links,
+                    top: '15%', // 增加 top 值，将图表整体下移，与标题拉开空隙
+                    bottom: '5%',
+                    emphasis: {
+                        focus: 'adjacency'
+                    },
+                    nodeAlign: 'left',
+                    layoutIterations: 0, // 设置为0以严格遵守nodes数组中的顺序，保证完成的节点在上方
+                    lineStyle: {
+                        color: 'gradient',
+                        curveness: 0.5
+                    },
+                    label: {
+                        position: 'right',
+                        formatter: function(params) {
+                            return params.data.name + '\n' + params.data.uv + '人 (' + params.data.percent + '%)';
+                        }
+                    }
+                }
+            ]
+        };
+
+        option && myChart.setOption(option);
+    </script>
+</body>
+</html>

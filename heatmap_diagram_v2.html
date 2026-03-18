@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>增强版热力图 - 正负向对比</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        html, body, #main { width: 100%; height: 100%; margin: 0; padding: 0; }
+    </style>
+</head>
+<body>
+    <div id="main"></div>
+    <script>
+        var chartDom = document.getElementById('main');
+        var myChart = echarts.init(chartDom);
+        var option;
+        
+        const xNames = ["互动","浏览文章","浏览付费文章","付费","次日留存"];
+        const yNames = ["互动","无互动","浏览文章","无浏览文章","浏览付费文章","无浏览付费文章","付费","未付费","次日留存","次日未留存"];
+        const data = [[0,0,100],[1,0,83.3],[2,0,43.6],[3,0,6.1],[4,0,24.9],[0,1,0],[1,1,6.4],[2,1,3.6],[3,1,0.3],[4,1,7.5],[0,2,97.8],[1,2,100],[2,2,52.5],[3,2,7.2],[4,2,27.7],[0,3,37.6],[1,3,0],[2,3,0],[3,3,0.3],[4,3,8],[0,4,97.6],[1,4,100],[2,4,100],[3,4,11.8],[4,4,30.2],[0,5,66.4],[1,5,47.7],[2,5,0],[3,5,1.1],[4,5,16.1],[0,6,98.7],[1,6,98.1],[2,6,84.7],[3,6,100],[4,6,37.6],[0,7,76.1],[1,7,64.1],[2,7,32],[3,7,0],[4,7,20.1],[0,8,91.8],[1,8,86.9],[2,8,49.8],[3,8,8.6],[4,8,100],[0,9,73.3],[1,9,60.1],[2,9,30.4],[3,9,3.8],[4,9,0]];
+        
+        option = {
+            title: { 
+                text: '跨环节转化率热力图 (含正负向对比)', 
+                subtext: '行：基准行为 -> 列：目标行为 (交叉点为转化率%)', 
+                left: 'center', 
+                top: 20 
+            },
+            tooltip: {
+                position: 'top',
+                formatter: function (params) {
+                    return '基准: ' + yNames[params.value[1]] + '<br/>' +
+                           '目标: ' + xNames[params.value[0]] + '<br/>' +
+                           '转化率: ' + params.value[2] + '%';
+                }
+            },
+            grid: { height: '70%', top: '15%', left: '15%' },
+            xAxis: { 
+                type: 'category', 
+                data: xNames, 
+                splitArea: { show: true }, 
+                name: '目标行为', 
+                nameLocation: 'middle', 
+                nameGap: 30 
+            },
+            yAxis: { 
+                type: 'category', 
+                data: yNames, 
+                splitArea: { show: true }, 
+                inverse: true, // 反转Y轴，让第一项在最上面
+                name: '基准行为', 
+                nameLocation: 'middle', 
+                nameGap: 80,
+                axisLabel: {
+                    formatter: function (value) {
+                        // 给负向行为加上灰色标识，正向行为加粗，方便视觉区分
+                        if (value.indexOf('无') > -1 || value.indexOf('未') > -1) {
+                            return '{negative|' + value + '}';
+                        }
+                        return '{positive|' + value + '}';
+                    },
+                    rich: {
+                        positive: { fontWeight: 'bold', color: '#333' },
+                        negative: { color: '#999' }
+                    }
+                }
+            },
+            visualMap: {
+                min: 0, max: 100, calculable: true, orient: 'horizontal', left: 'center', bottom: '2%',
+                inRange: { color: ['#f6efa6', '#d88273', '#bf444c'] }
+            },
+            series: [{
+                name: '转化率', type: 'heatmap', data: data,
+                label: { show: true, formatter: '{@[2]}%' },
+                emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
+            }]
+        };
+        
+        option && myChart.setOption(option);
+    </script>
+</body>
+</html>

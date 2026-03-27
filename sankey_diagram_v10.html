@@ -1,0 +1,498 @@
+// ... existing code ...
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>用户行为流转桑基图 V10 (多视图动态对比版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            gap: 20px;
+        }
+        
+        /* 顶部全局控制区 */
+        .global-controls {
+            background: #fff;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            flex-shrink: 0;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-right: 2px solid #eee;
+            padding-right: 20px;
+        }
+        .control-group:last-child {
+            border-right: none;
+            padding-right: 0;
+        }
+        .control-group h3 {
+            margin: 0;
+            font-size: 15px;
+            color: #333;
+        }
+        .checkbox-group, .radio-group {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+        }
+        .checkbox-group label, .radio-group label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            color: #444;
+        }
+        .checkbox-group input, .radio-group input {
+            margin-right: 6px;
+        }
+
+        /* 图表网格区 */
+        .charts-grid {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-height: 0; /* 允许内部元素收缩 */
+        }
+        .chart-wrapper {
+            flex: 1;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-height: 200px; /* 防止被压得太扁 */
+        }
+        
+        /* 视图内部的控制条 (移到顶部，不遮挡图表) */
+        .view-header {
+            padding: 10px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            background: #fafafa;
+            border-radius: 12px 12px 0 0;
+        }
+        .view-title {
+            font-weight: bold;
+            color: #333;
+            margin-right: 20px;
+            font-size: 14px;
+        }
+        .view-channel-select {
+            display: flex;
+            gap: 15px;
+            font-size: 13px;
+        }
+        .view-channel-select label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .view-channel-select input {
+            margin-right: 4px;
+        }
+        
+        .chart-dom {
+            flex: 1;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 全局控制区 -->
+        <div class="global-controls">
+            <!-- 视图数量控制 -->
+            <div class="control-group">
+                <h3>视图数量</h3>
+                <div class="radio-group" id="view-count-controls">
+                    <label><input type="radio" name="viewCount" value="1" checked onchange="changeViewCount()"> 1个视图 (大图)</label>
+                    <label><input type="radio" name="viewCount" value="2" onchange="changeViewCount()"> 2个视图 (对比)</label>
+                    <label><input type="radio" name="viewCount" value="3" onchange="changeViewCount()"> 3个视图 (多维)</label>
+                </div>
+            </div>
+
+            <!-- 节点筛选控制 -->
+            <div class="control-group">
+                <h3>节点筛选</h3>
+                <div class="checkbox-group" id="global-node-controls">
+                    <label><input type="checkbox" value="0" checked onchange="updateAllCharts()"> 互动</label>
+                    <label><input type="checkbox" value="1" checked onchange="updateAllCharts()"> 浏览文章</label>
+                    <label><input type="checkbox" value="2" checked onchange="updateAllCharts()"> 浏览付费文章</label>
+                    <label><input type="checkbox" value="3" checked onchange="updateAllCharts()"> 付费</label>
+                    <label><input type="checkbox" value="4" checked onchange="updateAllCharts()"> 次日留存</label>
+                </div>
+            </div>
+            <span style="font-size: 12px; color: #888; margin-left: auto;">* 取消勾选将自动跳过该节点，并按比例重新分配流转路径</span>
+        </div>
+
+        <!-- 图表网格区 -->
+        <div class="charts-grid" id="charts-container">
+            <!-- 视图 1 -->
+            <div class="chart-wrapper" id="wrapper-1">
+                <div class="view-header">
+                    <div class="view-title">视图 1</div>
+                    <div class="view-channel-select">
+                        <label><input type="radio" name="channel1" value="all" checked onchange="updateChart(1)"> 全部渠道 (大盘)</label>
+                        <label><input type="radio" name="channel1" value="ad" onchange="updateChart(1)"> 广告投放 (Ad)</label>
+                        <label><input type="radio" name="channel1" value="code" onchange="updateChart(1)"> 口令分享 (Code)</label>
+                        <label><input type="radio" name="channel1" value="organic" onchange="updateChart(1)"> 自然流量 (Organic)</label>
+                    </div>
+                </div>
+                <div id="chart1" class="chart-dom"></div>
+            </div>
+
+            <!-- 视图 2 (默认隐藏) -->
+            <div class="chart-wrapper" id="wrapper-2" style="display: none;">
+                <div class="view-header">
+                    <div class="view-title">视图 2</div>
+                    <div class="view-channel-select">
+                        <label><input type="radio" name="channel2" value="all" onchange="updateChart(2)"> 全部渠道 (大盘)</label>
+                        <label><input type="radio" name="channel2" value="ad" checked onchange="updateChart(2)"> 广告投放 (Ad)</label>
+                        <label><input type="radio" name="channel2" value="code" onchange="updateChart(2)"> 口令分享 (Code)</label>
+                        <label><input type="radio" name="channel2" value="organic" onchange="updateChart(2)"> 自然流量 (Organic)</label>
+                    </div>
+                </div>
+                <div id="chart2" class="chart-dom"></div>
+            </div>
+
+            <!-- 视图 3 (默认隐藏) -->
+            <div class="chart-wrapper" id="wrapper-3" style="display: none;">
+                <div class="view-header">
+                    <div class="view-title">视图 3</div>
+                    <div class="view-channel-select">
+                        <label><input type="radio" name="channel3" value="all" onchange="updateChart(3)"> 全部渠道 (大盘)</label>
+                        <label><input type="radio" name="channel3" value="ad" onchange="updateChart(3)"> 广告投放 (Ad)</label>
+                        <label><input type="radio" name="channel3" value="code" checked onchange="updateChart(3)"> 口令分享 (Code)</label>
+                        <label><input type="radio" name="channel3" value="organic" onchange="updateChart(3)"> 自然流量 (Organic)</label>
+                    </div>
+                </div>
+                <div id="chart3" class="chart-dom"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 初始化 ECharts 实例
+        var charts = {
+            1: echarts.init(document.getElementById('chart1')),
+            2: echarts.init(document.getElementById('chart2')),
+            3: echarts.init(document.getElementById('chart3'))
+        };
+
+        // --- 真实数据源 (与 V8 保持一致) ---
+        const dataAll = {
+            nodes: [{"name":"互动","depth":0,"itemStyle":{"color":"#5470c6"},"uv":1072078,"percent":"77.1"},{"name":"无互动","depth":0,"itemStyle":{"color":"#d3d3d3"},"uv":317688,"percent":"22.9"},{"name":"浏览文章","depth":1,"itemStyle":{"color":"#91cc75"},"uv":913360,"percent":"65.7"},{"name":"无浏览文章","depth":1,"itemStyle":{"color":"#d3d3d3"},"uv":476406,"percent":"34.3"},{"name":"浏览付费文章","depth":2,"itemStyle":{"color":"#fac858"},"uv":479315,"percent":"34.5"},{"name":"无浏览付费文章","depth":2,"itemStyle":{"color":"#d3d3d3"},"uv":910451,"percent":"65.5"},{"name":"付费","depth":3,"itemStyle":{"color":"#ee6666"},"uv":66752,"percent":"4.8"},{"name":"未付费","depth":3,"itemStyle":{"color":"#d3d3d3"},"uv":1323014,"percent":"95.2"},{"name":"次日留存","depth":4,"itemStyle":{"color":"#73c0de"},"uv":291272,"percent":"21.0"},{"name":"次日未留存","depth":4,"itemStyle":{"color":"#d3d3d3"},"uv":1098494,"percent":"79.0"}],
+            links: [{"source":"无互动","target":"无浏览文章","value":297230,"rate":"93.56%","edgeLabel":{"show":false,"formatter":"93.56%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"无浏览文章","target":"无浏览付费文章","value":476406,"rate":"100.00%","edgeLabel":{"show":false,"formatter":"100.00%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"无浏览付费文章","target":"未付费","value":900222,"rate":"98.88%","edgeLabel":{"show":false,"formatter":"98.88%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"未付费","target":"次日留存","value":266171,"rate":"20.12%","edgeLabel":{"show":false,"formatter":"20.12%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"无互动","target":"浏览文章","value":20458,"rate":"6.44%","edgeLabel":{"show":false,"formatter":"6.44%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"浏览文章","target":"无浏览付费文章","value":434045,"rate":"47.52%","edgeLabel":{"show":false,"formatter":"47.52%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"无浏览付费文章","target":"付费","value":10229,"rate":"1.12%","edgeLabel":{"show":false,"formatter":"1.12%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"付费","target":"次日留存","value":25101,"rate":"37.60%","edgeLabel":{"show":true,"formatter":"37.60%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"互动","target":"浏览文章","value":892902,"rate":"83.29%","edgeLabel":{"show":true,"formatter":"83.29%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"浏览文章","target":"浏览付费文章","value":479315,"rate":"52.48%","edgeLabel":{"show":true,"formatter":"52.48%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"浏览付费文章","target":"未付费","value":422792,"rate":"88.21%","edgeLabel":{"show":false,"formatter":"88.21%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"未付费","target":"次日未留存","value":1056843,"rate":"79.88%","edgeLabel":{"show":false,"formatter":"79.88%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"付费","target":"次日未留存","value":41651,"rate":"62.40%","edgeLabel":{"show":false,"formatter":"62.40%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"浏览付费文章","target":"付费","value":56523,"rate":"11.79%","edgeLabel":{"show":true,"formatter":"11.79%","color":"#000","fontSize":13,"fontWeight":"bold"}},{"source":"互动","target":"无浏览文章","value":179176,"rate":"16.71%","edgeLabel":{"show":false,"formatter":"16.71%","color":"#000","fontSize":13,"fontWeight":"bold"}}]
+        };
+
+        const dataAd = {
+            nodes: [
+                {"name":"互动","depth":0,"itemStyle":{"color":"#5470c6"},"uv":253280,"percent":"91.5"},
+                {"name":"无互动","depth":0,"itemStyle":{"color":"#d3d3d3"},"uv":23383,"percent":"8.5"},
+                {"name":"浏览文章","depth":1,"itemStyle":{"color":"#91cc75"},"uv":210834,"percent":"76.2"},
+                {"name":"无浏览文章","depth":1,"itemStyle":{"color":"#d3d3d3"},"uv":65829,"percent":"23.8"},
+                {"name":"浏览付费文章","depth":2,"itemStyle":{"color":"#fac858"},"uv":119924,"percent":"43.3"},
+                {"name":"无浏览付费文章","depth":2,"itemStyle":{"color":"#d3d3d3"},"uv":156739,"percent":"56.7"},
+                {"name":"付费","depth":3,"itemStyle":{"color":"#ee6666"},"uv":20076,"percent":"7.3"},
+                {"name":"未付费","depth":3,"itemStyle":{"color":"#d3d3d3"},"uv":256587,"percent":"92.7"},
+                {"name":"次日留存","depth":4,"itemStyle":{"color":"#73c0de"},"uv":80100,"percent":"29.0"},
+                {"name":"次日未留存","depth":4,"itemStyle":{"color":"#d3d3d3"},"uv":196563,"percent":"71.0"}
+            ],
+            links: [
+                {"source":"无互动","target":"无浏览文章","value":23206,"rate":"99.24%"},
+                {"source":"无浏览文章","target":"无浏览付费文章","value":65829,"rate":"100.00%"},
+                {"source":"无浏览付费文章","target":"未付费","value":153168,"rate":"97.72%"},
+                {"source":"未付费","target":"次日留存","value":71486,"rate":"27.86%"},
+                {"source":"无互动","target":"浏览文章","value":177,"rate":"0.76%"},
+                {"source":"浏览文章","target":"无浏览付费文章","value":90910,"rate":"43.12%"},
+                {"source":"无浏览付费文章","target":"付费","value":3571,"rate":"2.28%"},
+                {"source":"付费","target":"次日留存","value":8614,"rate":"42.91%"},
+                {"source":"互动","target":"浏览文章","value":210657,"rate":"83.17%"},
+                {"source":"浏览文章","target":"浏览付费文章","value":119924,"rate":"56.88%"},
+                {"source":"浏览付费文章","target":"未付费","value":103419,"rate":"86.24%"},
+                {"source":"未付费","target":"次日未留存","value":185101,"rate":"72.14%"},
+                {"source":"付费","target":"次日未留存","value":11462,"rate":"57.09%"},
+                {"source":"浏览付费文章","target":"付费","value":16505,"rate":"13.76%"},
+                {"source":"互动","target":"无浏览文章","value":42623,"rate":"16.83%"}
+            ]
+        };
+
+        const dataCode = {
+            nodes: [
+                {"name":"互动","depth":0,"itemStyle":{"color":"#5470c6"},"uv":119281,"percent":"83.2"},
+                {"name":"无互动","depth":0,"itemStyle":{"color":"#d3d3d3"},"uv":24015,"percent":"16.8"},
+                {"name":"浏览文章","depth":1,"itemStyle":{"color":"#91cc75"},"uv":127982,"percent":"89.3"},
+                {"name":"无浏览文章","depth":1,"itemStyle":{"color":"#d3d3d3"},"uv":15314,"percent":"10.7"},
+                {"name":"浏览付费文章","depth":2,"itemStyle":{"color":"#fac858"},"uv":81609,"percent":"56.9"},
+                {"name":"无浏览付费文章","depth":2,"itemStyle":{"color":"#d3d3d3"},"uv":61687,"percent":"43.1"},
+                {"name":"付费","depth":3,"itemStyle":{"color":"#ee6666"},"uv":24520,"percent":"17.1"},
+                {"name":"未付费","depth":3,"itemStyle":{"color":"#d3d3d3"},"uv":118776,"percent":"82.9"},
+                {"name":"次日留存","depth":4,"itemStyle":{"color":"#73c0de"},"uv":28606,"percent":"20.0"},
+                {"name":"次日未留存","depth":4,"itemStyle":{"color":"#d3d3d3"},"uv":114690,"percent":"80.0"}
+            ],
+            links: [
+                {"source":"无互动","target":"无浏览文章","value":4816,"rate":"20.05%"},
+                {"source":"无浏览文章","target":"无浏览付费文章","value":15314,"rate":"100.00%"},
+                {"source":"无浏览付费文章","target":"未付费","value":55754,"rate":"90.38%"},
+                {"source":"未付费","target":"次日留存","value":20096,"rate":"16.92%"},
+                {"source":"无互动","target":"浏览文章","value":19199,"rate":"79.95%"},
+                {"source":"浏览文章","target":"无浏览付费文章","value":46373,"rate":"36.23%"},
+                {"source":"无浏览付费文章","target":"付费","value":5933,"rate":"9.62%"},
+                {"source":"付费","target":"次日留存","value":8510,"rate":"34.71%"},
+                {"source":"互动","target":"浏览文章","value":108783,"rate":"91.20%"},
+                {"source":"浏览文章","target":"浏览付费文章","value":81609,"rate":"63.77%"},
+                {"source":"浏览付费文章","target":"未付费","value":63022,"rate":"77.22%"},
+                {"source":"未付费","target":"次日未留存","value":98680,"rate":"83.08%"},
+                {"source":"付费","target":"次日未留存","value":16010,"rate":"65.29%"},
+                {"source":"浏览付费文章","target":"付费","value":18587,"rate":"22.78%"},
+                {"source":"互动","target":"无浏览文章","value":10498,"rate":"8.80%"}
+            ]
+        };
+
+        const dataOrganic = {
+            nodes: [
+                {"name":"互动","depth":0,"itemStyle":{"color":"#5470c6"},"uv":699517,"percent":"72.1"},
+                {"name":"无互动","depth":0,"itemStyle":{"color":"#d3d3d3"},"uv":270290,"percent":"27.9"},
+                {"name":"浏览文章","depth":1,"itemStyle":{"color":"#91cc75"},"uv":574544,"percent":"59.2"},
+                {"name":"无浏览文章","depth":1,"itemStyle":{"color":"#d3d3d3"},"uv":395263,"percent":"40.8"},
+                {"name":"浏览付费文章","depth":2,"itemStyle":{"color":"#fac858"},"uv":277782,"percent":"28.6"},
+                {"name":"无浏览付费文章","depth":2,"itemStyle":{"color":"#d3d3d3"},"uv":692025,"percent":"71.4"},
+                {"name":"付费","depth":3,"itemStyle":{"color":"#ee6666"},"uv":22156,"percent":"2.3"},
+                {"name":"未付费","depth":3,"itemStyle":{"color":"#d3d3d3"},"uv":947651,"percent":"97.7"},
+                {"name":"次日留存","depth":4,"itemStyle":{"color":"#73c0de"},"uv":182566,"percent":"18.8"},
+                {"name":"次日未留存","depth":4,"itemStyle":{"color":"#d3d3d3"},"uv":787241,"percent":"81.2"}
+            ],
+            links: [
+                {"source":"无互动","target":"无浏览文章","value":269208,"rate":"99.60%"},
+                {"source":"无浏览文章","target":"无浏览付费文章","value":395263,"rate":"100.00%"},
+                {"source":"无浏览付费文章","target":"未付费","value":691300,"rate":"99.90%"},
+                {"source":"未付费","target":"次日留存","value":174589,"rate":"18.42%"},
+                {"source":"无互动","target":"浏览文章","value":1082,"rate":"0.40%"},
+                {"source":"浏览文章","target":"无浏览付费文章","value":296762,"rate":"51.65%"},
+                {"source":"无浏览付费文章","target":"付费","value":725,"rate":"0.10%"},
+                {"source":"付费","target":"次日留存","value":7977,"rate":"36.00%"},
+                {"source":"互动","target":"浏览文章","value":573462,"rate":"81.98%"},
+                {"source":"浏览文章","target":"浏览付费文章","value":277782,"rate":"48.35%"},
+                {"source":"浏览付费文章","target":"未付费","value":256351,"rate":"92.28%"},
+                {"source":"未付费","target":"次日未留存","value":773062,"rate":"81.58%"},
+                {"source":"付费","target":"次日未留存","value":14179,"rate":"64.00%"},
+                {"source":"浏览付费文章","target":"付费","value":21431,"rate":"7.72%"},
+                {"source":"互动","target":"无浏览文章","value":126055,"rate":"18.02%"}
+            ]
+        };
+
+        const dataSourceMap = {
+            'all': { data: dataAll, name: '全部渠道 (大盘)' },
+            'ad': { data: dataAd, name: '广告投放 (Ad)' },
+            'code': { data: dataCode, name: '口令分享 (Code)' },
+            'organic': { data: dataOrganic, name: '自然流量 (Organic)' }
+        };
+
+        // --- 核心计算逻辑 ---
+        function calculateLinks(nodesByDepth, linksFrom, depthA, depthB) {
+            const newLinks = [];
+            const nodesA = nodesByDepth[depthA];
+            
+            nodesA.forEach(nodeA => {
+                let currentFlow = {};
+                currentFlow[nodeA.name] = nodeA.uv;
+                
+                for (let d = depthA; d < depthB; d++) {
+                    let nextFlow = {};
+                    const nodesAtD = nodesByDepth[d];
+                    nodesAtD.forEach(nodeX => {
+                        const flowAtX = currentFlow[nodeX.name] || 0;
+                        if (flowAtX > 0) {
+                            const outLinks = linksFrom[nodeX.name];
+                            const totalOut = outLinks.reduce((sum, l) => sum + l.value, 0);
+                            outLinks.forEach(link => {
+                                const proportion = totalOut > 0 ? link.value / totalOut : 0;
+                                const flowToY = flowAtX * proportion;
+                                nextFlow[link.target] = (nextFlow[link.target] || 0) + flowToY;
+                            });
+                        }
+                    });
+                    currentFlow = nextFlow;
+                }
+                
+                nodesByDepth[depthB].forEach(nodeB => {
+                    const val = currentFlow[nodeB.name] || 0;
+                    if (val > 0) {
+                        const rate = (val / nodeA.uv * 100).toFixed(2) + '%';
+                        const isPositivePath = !nodeA.name.startsWith('无') && !nodeA.name.startsWith('未') &&
+                                               !nodeB.name.startsWith('无') && !nodeB.name.startsWith('未');
+                        newLinks.push({
+                            source: nodeA.name,
+                            target: nodeB.name,
+                            value: Math.round(val),
+                            rate: rate,
+                            edgeLabel: {
+                                show: isPositivePath,
+                                formatter: rate,
+                                color: "#000",
+                                fontSize: 12,
+                                fontWeight: "bold"
+                            }
+                        });
+                    }
+                });
+            });
+            return newLinks;
+        }
+
+        // --- 更新单个图表 ---
+        function updateChart(chartIndex) {
+            const chartInstance = charts[chartIndex];
+            const selectedChannel = document.querySelector(`input[name="channel${chartIndex}"]:checked`).value;
+            const sourceData = dataSourceMap[selectedChannel].data;
+            
+            // 获取全局节点筛选状态
+            const checkboxes = document.querySelectorAll('#global-node-controls input[type="checkbox"]');
+            const activeDepths = [];
+            checkboxes.forEach(cb => {
+                if (cb.checked) activeDepths.push(parseInt(cb.value));
+            });
+            
+            if (activeDepths.length < 2) {
+                alert("至少需要保留两个节点层级！");
+                if (window.event && window.event.target) window.event.target.checked = true;
+                return;
+            }
+            
+            activeDepths.sort((a, b) => a - b);
+            
+            // 准备数据结构
+            const nodesByDepth = [];
+            for (let i = 0; i <= 4; i++) {
+                nodesByDepth[i] = sourceData.nodes.filter(n => n.depth === i);
+            }
+
+            const linksFrom = {};
+            sourceData.nodes.forEach(n => linksFrom[n.name] = []);
+            sourceData.links.forEach(l => {
+                if(linksFrom[l.source]) linksFrom[l.source].push(l);
+            });
+            
+            // 过滤节点
+            const filteredNodes = [];
+            activeDepths.forEach((depth, index) => {
+                nodesByDepth[depth].forEach(n => {
+                    const newNode = JSON.parse(JSON.stringify(n));
+                    newNode.depth = index;
+                    filteredNodes.push(newNode);
+                });
+            });
+            
+            // 计算连线
+            const filteredLinks = [];
+            for (let i = 0; i < activeDepths.length - 1; i++) {
+                const d1 = activeDepths[i];
+                const d2 = activeDepths[i+1];
+                const newLinks = calculateLinks(nodesByDepth, linksFrom, d1, d2);
+                filteredLinks.push(...newLinks);
+            }
+            
+            // 渲染图表
+            const option = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function(params) {
+                        if (params.dataType === 'edge') {
+                            return params.data.source + ' -> ' + params.data.target + '<br/>' +
+                                   'UV: ' + params.data.value + '<br/>' +
+                                   '转化率: ' + params.data.rate;
+                        } else {
+                            return params.name + '<br/>UV: ' + params.data.uv + ' (' + params.data.percent + '%)';
+                        }
+                    }
+                },
+                series: [{
+                    type: 'sankey',
+                    data: filteredNodes,
+                    links: filteredLinks,
+                    top: '5%',
+                    bottom: '5%',
+                    left: '5%',
+                    right: '15%', // 加大右侧边距，防止最右侧节点的文字标签被截断
+                    emphasis: { focus: 'adjacency' },
+                    nodeAlign: 'left',
+                    layoutIterations: 0,
+                    lineStyle: { color: 'gradient', curveness: 0.5 },
+                    label: {
+                        position: 'right',
+                        formatter: function(params) {
+                            return params.data.name + '\n' + params.data.uv + ' (' + params.data.percent + '%)';
+                        }
+                    }
+                }]
+            };
+            
+            chartInstance.hideLoading();
+            chartInstance.setOption(option);
+        }
+
+        // --- 联动更新所有可见图表 ---
+        function updateAllCharts() {
+            const viewCount = parseInt(document.querySelector('input[name="viewCount"]:checked').value);
+            for (let i = 1; i <= viewCount; i++) {
+                updateChart(i);
+            }
+        }
+
+        // --- 切换视图数量 ---
+        function changeViewCount() {
+            const viewCount = parseInt(document.querySelector('input[name="viewCount"]:checked').value);
+            
+            // 控制 DOM 显示/隐藏
+            document.getElementById('wrapper-1').style.display = viewCount >= 1 ? 'flex' : 'none';
+            document.getElementById('wrapper-2').style.display = viewCount >= 2 ? 'flex' : 'none';
+            document.getElementById('wrapper-3').style.display = viewCount >= 3 ? 'flex' : 'none';
+            
+            // 重新调整所有图表大小并更新数据
+            setTimeout(() => {
+                for (let i = 1; i <= 3; i++) {
+                    if (viewCount >= i) {
+                        charts[i].resize();
+                        updateChart(i);
+                    }
+                }
+            }, 100);
+        }
+
+        // 初始化 (默认 1 个视图)
+        changeViewCount();
+
+        // 窗口缩放自适应
+        window.addEventListener('resize', function() {
+            const viewCount = parseInt(document.querySelector('input[name="viewCount"]:checked').value);
+            for (let i = 1; i <= viewCount; i++) {
+                charts[i].resize();
+            }
+        });
+    </script>
+</body>
+</html>
+// ... existing code ...
